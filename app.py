@@ -1,194 +1,149 @@
 import streamlit as st
 from PIL import Image, ImageDraw, ImageFont
-import os
 import random
-from io import BytesIO
+import io
 
-# --- [1. 기본 설정] ---
-st.set_page_config(page_title="숨은 글자 찾기 생성기", page_icon="👀", layout="wide")
+# --- 페이지 설정 ---
+st.set_page_config(page_title="틀린 숫자 찾기 생성기", layout="wide")
 
-FONT_FILE = "NanumGothic-ExtraBold.ttf"
-SAVE_DIR = "saved_images"
-if not os.path.exists(SAVE_DIR):
-    os.makedirs(SAVE_DIR)
+st.title("🧩 틀린 숫자/글자 찾기 이미지 생성기")
 
-# --- [2. 문제 세트 데이터] ---
-PROBLEM_SETS = {
-    "나 vs 너 (한글)": ("나", "너", "숫자 '너'"), # (오답, 정답, 타겟이름)
-    "3 vs 8 (숫자)": ("3", "8", "숫자 '8'"),
-    "5 vs 2 (숫자)": ("5", "2", "숫자 '2'"),
-    "6 vs 9 (숫자)": ("6", "9", "숫자 '9'"),
-    "F vs E (알파벳)": ("F", "E", "알파벳 'E'"),
-    "O vs Q (알파벳)": ("O", "Q", "알파벳 'Q'"),
-    "R vs P (알파벳)": ("R", "P", "알파벳 'P'"),
-    "大 vs 太 (한자)": ("大", "太", "한자 '클 태(太)'"),
-    "왕 vs 욍 (한글)": ("왕", "욍", "글자 '욍'"),
-    "숲 vs 슾 (한글)": ("숲", "슾", "글자 '슾'"),
-}
+# --- 사이드바: 설정 컨트롤 ---
+with st.sidebar:
+    st.header("1. 콘텐츠 설정")
+    
+    # 추천 조합 리스트
+    presets = {
+        "직접 입력": ("?", "?"),
+        "88 vs 98 (클래식)": ("88", "98"),
+        "5 vs 2": ("5", "2"),
+        "6 vs 9": ("6", "9"),
+        "3 vs 8": ("3", "8"),
+        "1 vs 7": ("1", "7"),
+        "0 vs 8": ("0", "8"),
+        "F vs E": ("F", "E"),
+        "O vs Q": ("O", "Q"),
+        "M vs W": ("M", "W"),
+        "B vs 8": ("B", "8"),
+        "S vs 5": ("S", "5"),
+        "Z vs 2": ("Z", "2"),
+        "R vs P": ("R", "P"),
+        "K vs X": ("K", "X"),
+        "Il vs 1": ("Il", "1"),
+        "한글: 갹 vs 가": ("갹", "가"),
+        "한글: 먕 vs 밍": ("먕", "밍"),
+        "한글: 쀼 vs 뀨": ("쀼", "뀨"),
+    }
+    
+    selected_preset = st.selectbox("추천 조합 선택", list(presets.keys()), index=1)
+    
+    if selected_preset == "직접 입력":
+        base_char = st.text_input("배경 글자 (99개)", value="A")
+        target_char = st.text_input("정답 글자 (1개)", value="B")
+    else:
+        base_char, target_char = presets[selected_preset]
+        st.info(f"배경: {base_char} / 정답: {target_char}")
 
-# --- [3. 기능 함수들] ---
-def get_font(size):
-    if os.path.exists(FONT_FILE): return ImageFont.truetype(FONT_FILE, size)
-    else: return ImageFont.load_default()
+    st.header("2. 상단 바 설정")
+    header_text = st.text_input("상단 텍스트", value=f"3초 안에 '{target_char}' 찾기")
+    header_bg_color = st.color_picker("상단 배경색", "#1D4ED8") # 파란색 계열
+    header_text_color = st.color_picker("상단 글자색", "#FFFF00") # 노란색
+    header_height_ratio = st.slider("상단 바 높이 비율", 10, 30, 15)
+    header_font_size = st.slider("상단 글자 크기", 20, 100, 45)
 
-def create_puzzle_image(params):
-    # 캔버스 생성
-    W, H = 1080, 1080 # 인스타/쇼츠 썸네일용 1:1 비율 (필요시 변경 가능)
-    if params['ratio'] == "9:16 (쇼츠)": W, H = 1080, 1920
-        
-    img = Image.new('RGB', (W, H), params['bg_color'])
+    st.header("3. 그리드 설정")
+    grid_font_size = st.slider("숫자(본문) 크기", 20, 80, 40)
+    grid_gap = st.slider("숫자 간격", 0, 50, 10)
+
+# --- 이미지 생성 로직 ---
+
+def create_puzzle_image(base, target, h_text, h_bg, h_fg, h_ratio, h_f_size, g_f_size, g_gap):
+    # 캔버스 설정 (고해상도)
+    W, H = 800, 1000
+    background_color = "white"
+    img = Image.new("RGB", (W, H), background_color)
     draw = ImageDraw.Draw(img)
-    
-    # 폰트 로드
-    font_header = get_font(params['header_fs'])
-    font_grid = get_font(params['grid_fs'])
-    
-    # --- 1. 헤더(상단바) 그리기 ---
-    header_h = params['header_h']
-    draw.rectangle([(0, 0), (W, header_h)], fill=params['header_bg'])
-    
-    # 헤더 텍스트
-    # anchor="mm" : 텍스트의 정중앙을 기준으로 좌표를 잡음
-    # X좌표: 화면 중앙 (W/2)
-    # Y좌표: 헤더 높이의 절반 + 사용자 미세조정 값
-    text_x = W / 2
-    text_y = (header_h / 2) + params['header_y_adj']
-    
-    draw.text((text_x, text_y), params['header_text'], font=font_header, fill=params['header_color'], anchor="mm")
 
-    # --- 2. 그리드(글자들) 그리기 ---
-    rows = params['rows']
-    cols = params['cols']
+    # 폰트 로드 (시스템에 있는 한글 폰트 경로로 변경 권장)
+    try:
+        # 윈도우/맥 환경에 따라 폰트 경로가 다를 수 있습니다.
+        # 같은 폴더에 'malgun.ttf'나 'NanumGothic.ttf'를 두고 쓰는 것이 가장 안전합니다.
+        font_path = "NanumGothic.ttf" 
+        header_font = ImageFont.truetype(font_path, h_f_size)
+        grid_font = ImageFont.truetype(font_path, g_f_size)
+    except:
+        # 폰트가 없으면 기본 폰트 사용 (한글 깨질 수 있음)
+        header_font = ImageFont.load_default()
+        grid_font = ImageFont.load_default()
+
+    # 1. 상단 바 그리기
+    header_height = int(H * (h_ratio / 100))
+    draw.rectangle([(0, 0), (W, header_height)], fill=h_bg)
     
-    # 그리드 영역 계산
-    grid_start_y = header_h + 50
-    grid_w = W - 100 # 좌우 여백 50씩
-    grid_h = H - grid_start_y - 50
-    
-    cell_w = grid_w / cols
-    cell_h = grid_h / rows
+    # 상단 텍스트 중앙 정렬
+    bbox = draw.textbbox((0, 0), h_text, font=header_font)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    draw.text(((W - text_w) / 2, (header_height - text_h) / 2 - 5), h_text, font=header_font, fill=h_fg)
+
+    # 2. 그리드 그리기 (10x10)
+    rows, cols = 10, 10
     
     # 정답 위치 랜덤 선정
-    target_row = random.randint(0, rows-1)
-    target_col = random.randint(0, cols-1)
+    target_pos = random.randint(0, rows * cols - 1)
     
-    wrong_char = params['wrong_char']
-    target_char = params['target_char']
+    # 그리드 시작 위치 (상단 바 아래부터)
+    start_y = header_height + 50
+    # 사용 가능한 높이
+    available_h = H - start_y - 50
     
-    for r in range(rows):
-        for c in range(cols):
-            # 현재 위치의 글자 결정
-            char = target_char if (r == target_row and c == target_col) else wrong_char
-            
-            # 좌표 계산 (각 셀의 중앙)
-            cx = 50 + (c * cell_w) + (cell_w / 2)
-            cy = grid_start_y + (r * cell_h) + (cell_h / 2)
-            
-            # 글자 그리기
-            # 정답 이미지가 아닐 경우(문제용)에는 그냥 그림
-            # 정답용 이미지일 경우, 정답에만 동그라미나 색상 표시 (여기선 간단히 색상 변경)
-            
-            text_color = params['grid_color']
-            if params['is_answer_mode'] and (r == target_row and c == target_col):
-                text_color = "#FF0000" # 정답은 빨간색
-                # 동그라미 그리기
-                left = cx - (params['grid_fs']/1.5)
-                top = cy - (params['grid_fs']/1.5)
-                right = cx + (params['grid_fs']/1.5)
-                bottom = cy + (params['grid_fs']/1.5)
-                draw.ellipse([(left, top), (right, bottom)], outline="#FF0000", width=10)
+    cell_w = W / cols
+    cell_h = available_h / rows
+    
+    for i in range(rows * cols):
+        r = i // cols
+        c = i % cols
+        
+        # 현재 위치의 글자 결정
+        current_char = target if i == target_pos else base
+        
+        # 각 셀의 중심 좌표 계산
+        cx = c * cell_w + cell_w / 2
+        cy = start_y + r * cell_h + cell_h / 2
+        
+        # 글자 크기 계산 및 그리기
+        char_bbox = draw.textbbox((0, 0), current_char, font=grid_font)
+        char_w = char_bbox[2] - char_bbox[0]
+        char_h = char_bbox[3] - char_bbox[1]
+        
+        draw.text((cx - char_w / 2, cy - char_h / 2), current_char, fill="black", font=grid_font)
 
-            draw.text((cx, cy), char, font=font_grid, fill=text_color, anchor="mm")
-            
     return img
 
-# --- [4. 메인 UI] ---
-st.title("👀 숨은 글자 찾기 생성기 (정밀조절판)")
+# --- 메인 화면 출력 ---
 
-col_L, col_R = st.columns([1, 1.5])
-
-with col_L:
-    st.header("1. 문제 설정")
+# 이미지 생성 버튼 없이 실시간 반영 또는 버튼 클릭 시 생성
+if st.button("이미지 생성 (또는 새로고침)", type="primary"):
+    generated_img = create_puzzle_image(
+        base_char, target_char, 
+        header_text, header_bg_color, header_text_color, 
+        header_height_ratio, header_font_size, 
+        grid_font_size, grid_gap
+    )
     
-    # 문제 프리셋 선택
-    pset_name = st.selectbox("추천 문제 세트", list(PROBLEM_SETS.keys()))
-    wrong, target, t_name = PROBLEM_SETS[pset_name]
+    # 이미지 표시
+    st.image(generated_img, caption="생성된 퍼즐 이미지", use_container_width=True)
     
-    # 커스텀 가능하도록
-    c1, c2 = st.columns(2)
-    with c1: wrong_char = st.text_input("오답 글자 (배경)", value=wrong)
-    with c2: target_char = st.text_input("정답 글자 (타겟)", value=target)
+    # 다운로드 버튼
+    buf = io.BytesIO()
+    generated_img.save(buf, format="PNG")
+    byte_im = buf.getvalue()
     
-    # 헤더 문구 자동 생성
-    default_header = f"3초 안에 {t_name} 찾기"
-    header_text = st.text_input("상단 문구 내용", value=default_header)
-
-    st.write("---")
-    st.header("2. 디자인 & 배치 설정")
-    
-    with st.expander("🎨 색상 설정", expanded=False):
-        c_bg, c_grid = st.columns(2)
-        bg_color = c_bg.color_picker("전체 배경색", "#FFFFFF")
-        grid_color = c_grid.color_picker("글자 색상", "#000000")
-        
-        c_hbg, c_htxt = st.columns(2)
-        header_bg = c_hbg.color_picker("상단바 배경", "#334488")
-        header_color = c_htxt.color_picker("상단바 글자", "#FFD700")
-
-    with st.expander("📏 상단바(헤더) 정밀 조절", expanded=True):
-        st.info("여기서 제목의 크기와 위치를 조절하세요!")
-        
-        header_h = st.slider("상단바 높이 (배경)", 100, 600, 300)
-        
-        # [요청하신 기능] 글자 크기 & 위치
-        col_h1, col_h2 = st.columns(2)
-        with col_h1:
-            header_fs = st.slider("제목 글자 크기", 30, 200, 90)
-        with col_h2:
-            header_y_adj = st.slider("제목 위치 (위/아래)", -150, 150, 0, help="양수면 아래로, 음수면 위로 움직입니다.")
-
-    with st.expander("▦ 그리드(글자판) 설정", expanded=False):
-        col_g1, col_g2 = st.columns(2)
-        with col_g1: rows = st.slider("세로 줄 수", 5, 20, 10)
-        with col_g2: cols = st.slider("가로 줄 수", 5, 20, 10)
-        
-        grid_fs = st.slider("글자판 글자 크기", 20, 150, 80)
-
-    ratio = st.radio("이미지 비율", ["1:1 (피드/썸네일)", "9:16 (쇼츠)"], horizontal=True)
-
-    # 파라미터 딕셔너리 생성
-    params = {
-        'wrong_char': wrong_char, 'target_char': target_char,
-        'header_text': header_text, 'header_h': header_h, 
-        'header_fs': header_fs, 'header_y_adj': header_y_adj, # [NEW]
-        'header_bg': header_bg, 'header_color': header_color,
-        'rows': rows, 'cols': cols, 'grid_fs': grid_fs, 'grid_color': grid_color,
-        'bg_color': bg_color, 'ratio': ratio,
-        'is_answer_mode': False
-    }
-
-with col_R:
-    st.header("3. 결과물 확인")
-    
-    tab1, tab2 = st.tabs(["❓ 문제용 이미지", "⭕ 정답용 이미지"])
-    
-    # 문제 이미지 생성
-    with tab1:
-        img_q = create_puzzle_image(params)
-        st.image(img_q, caption="문제 이미지", use_container_width=True)
-        
-        buf_q = BytesIO()
-        img_q.save(buf_q, format="JPEG", quality=95)
-        st.download_button("💾 문제 이미지 다운로드", buf_q.getvalue(), "puzzle_question.jpg", "image/jpeg")
-
-    # 정답 이미지 생성
-    with tab2:
-        params_ans = params.copy()
-        params_ans['is_answer_mode'] = True
-        
-        img_a = create_puzzle_image(params_ans)
-        st.image(img_a, caption="정답 이미지", use_container_width=True)
-        
-        buf_a = BytesIO()
-        img_a.save(buf_a, format="JPEG", quality=95)
-        st.download_button("💾 정답 이미지 다운로드", buf_a.getvalue(), "puzzle_answer.jpg", "image/jpeg")
+    st.download_button(
+        label="이미지 다운로드",
+        data=byte_im,
+        file_name="puzzle_game.png",
+        mime="image/png"
+    )
+else:
+    st.info("왼쪽 사이드바에서 설정을 마친 후 '이미지 생성' 버튼을 눌러주세요.")
