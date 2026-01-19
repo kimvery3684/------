@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>숫자 찾기 퍼즐 생성기</title>
+    <style>
+        :root {
+            --title-color: #ffffff;
+            --subtitle-color: #ffd700;
+            --grid-color: #333333;
+            --bg-color: #f0f0f0;
+            --header-bg-color: #1a365d;
+            --title-size: 2em;
+            --subtitle-size: 1.5em;
+            --grid-size: 1.2em;
+            --title-spacing: 0;
+            --subtitle-spacing: 0;
+            --grid-spacing: 0;
+            --title-line-height: 1.2;
+            --subtitle-line-height: 1.2;
+            --grid-line-height: 1.2;
+            --grid-weight: 400; /* 굵기 변수 추가됨 */
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #e9ecef;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .controls {
+            flex: 1;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            max-height: 80vh;
+        }
+
+        .preview {
+            flex: 2;
+            background: var(--bg-color);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h2 {
+            margin-top: 0;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .control-group input[type="color"],
+        .control-group input[type="number"],
+        .control-group input[type="range"], 
+        .control-group input[type="text"] {
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 5px;
+            box-sizing: border-box;
+        }
+
+        .header {
+            background-color: var(--header-bg-color);
+            padding: 20px;
+            text-align: center;
+        }
+
+        .title {
+            color: var(--title-color);
+            font-size: var(--title-size);
+            letter-spacing: var(--title-spacing);
+            line-height: var(--title-line-height);
+            margin: 0;
+            font-weight: bold;
+        }
+
+        .subtitle {
+            color: var(--subtitle-color);
+            font-size: var(--subtitle-size);
+            letter-spacing: var(--subtitle-spacing);
+            line-height: var(--subtitle-line-height);
+            margin: 10px 0 0;
+            font-weight: bold;
+        }
+
+        .grid-container {
+            padding: 20px;
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: var(--bg-color);
+        }
+
+        .number-grid {
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            gap: 5px;
+            color: var(--grid-color);
+            font-size: var(--grid-size);
+            letter-spacing: var(--grid-spacing);
+            line-height: var(--grid-line-height);
+            font-weight: var(--grid-weight); /* 굵기 적용 */
+            font-family: 'Courier New', monospace; /* 숫자 간격 일정을 위해 고정폭 글꼴 사용 */
+            white-space: pre;
+        }
+
+        .number-grid div {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>숫자 찾기 퍼즐 생성기</h1>
+
+    <div class="container">
+        <div class="controls">
+            <div class="control-group">
+                <h3>기본 설정</h3>
+                <label for="titleText">제목 텍스트</label>
+                <input type="text" id="titleText" value="숫자 찾기 도전">
+                
+                <label for="subtitleText">부제 텍스트</label>
+                <input type="text" id="subtitleText" value="3초 안에 숫자 '89' 찾기">
+                
+                <label for="targetNumber">찾을 숫자</label>
+                <input type="text" id="targetNumber" value="89" maxlength="2">
+                
+                <label for="fillerNumber">채울 숫자</label>
+                <input type="text" id="fillerNumber" value="98" maxlength="2">
+            </div>
+
+            <div class="control-group">
+                <h3>제목 스타일</h3>
+                <label for="titleColor">색상</label>
+                <input type="color" id="titleColor" value="#ffffff">
+                <label for="titleSize">크기 (em)</label>
+                <input type="number" id="titleSize" value="2" step="0.1">
+                <label for="titleSpacing">자간 (em)</label>
+                <input type="number" id="titleSpacing" value="0" step="0.05">
+                <label for="titleLineHeight">행간</label>
+                <input type="number" id="titleLineHeight" value="1.2" step="0.1">
+            </div>
+
+            <div class="control-group">
+                <h3>부제 스타일</h3>
+                <label for="subtitleColor">색상</label>
+                <input type="color" id="subtitleColor" value="#ffd700">
+                <label for="subtitleSize">크기 (em)</label>
+                <input type="number" id="subtitleSize" value="1.5" step="0.1">
+                <label for="subtitleSpacing">자간 (em)</label>
+                <input type="number" id="subtitleSpacing" value="0" step="0.05">
+                <label for="subtitleLineHeight">행간</label>
+                <input type="number" id="subtitleLineHeight" value="1.2" step="0.1">
+            </div>
+
+            <div class="control-group">
+                <h3>숫자 격자 스타일</h3>
+                <label for="gridColor">색상</label>
+                <input type="color" id="gridColor" value="#333333">
+                <label for="gridSize">크기 (em)</label>
+                <input type="number" id="gridSize" value="1.2" step="0.1">
+                <label for="gridSpacing">자간 (em)</label>
+                <input type="number" id="gridSpacing" value="0" step="0.05">
+                <label for="gridLineHeight">행간</label>
+                <input type="number" id="gridLineHeight" value="1.2" step="0.1">
+                
+                <label for="gridWeight">굵기 (100~900)</label>
+                <input type="range" id="gridWeight" min="100" max="900" step="100" value="400">
+                <div style="font-size: 0.8em; color: #666;">(오른쪽으로 갈수록 두꺼워집니다)</div>
+            </div>
+
+            <div class="control-group">
+                <h3>배경 스타일</h3>
+                <label for="headerBgColor">헤더 배경색</label>
+                <input type="color" id="headerBgColor" value="#1a365d">
+                <label for="bgColor">전체 배경색</label>
+                <input type="color" id="bgColor" value="#f0f0f0">
+            </div>
+        </div>
+
+        <div class="preview" id="previewArea">
+            <div class="header">
+                <h1 class="title" id="previewTitle">숫자 찾기 도전</h1>
+                <h2 class="subtitle" id="previewSubtitle">3초 안에 숫자 '89' 찾기</h2>
+            </div>
+            <div class="grid-container">
+                <div class="number-grid" id="numberGrid">
+                    </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const root = document.documentElement;
+        const previewTitle = document.getElementById('previewTitle');
+        const previewSubtitle = document.getElementById('previewSubtitle');
+        const numberGrid = document.getElementById('numberGrid');
+
+        // Text Inputs
+        document.getElementById('titleText').addEventListener('input', (e) => previewTitle.textContent = e.target.value);
+        document.getElementById('subtitleText').addEventListener('input', (e) => previewSubtitle.textContent = e.target.value);
+
+        // Style Inputs - Title
+        document.getElementById('titleColor').addEventListener('input', (e) => root.style.setProperty('--title-color', e.target.value));
+        document.getElementById('titleSize').addEventListener('input', (e) => root.style.setProperty('--title-size', e.target.value + 'em'));
+        document.getElementById('titleSpacing').addEventListener('input', (e) => root.style.setProperty('--title-spacing', e.target.value + 'em'));
+        document.getElementById('titleLineHeight').addEventListener('input', (e) => root.style.setProperty('--title-line-height', e.target.value));
+
+        // Style Inputs - Subtitle
+        document.getElementById('subtitleColor').addEventListener('input', (e) => root.style.setProperty('--subtitle-color', e.target.value));
+        document.getElementById('subtitleSize').addEventListener('input', (e) => root.style.setProperty('--subtitle-size', e.target.value + 'em'));
+        document.getElementById('subtitleSpacing').addEventListener('input', (e) => root.style.setProperty('--subtitle-spacing', e.target.value + 'em'));
+        document.getElementById('subtitleLineHeight').addEventListener('input', (e) => root.style.setProperty('--subtitle-line-height', e.target.value));
+
+        // Style Inputs - Grid
+        document.getElementById('gridColor').addEventListener('input', (e) => root.style.setProperty('--grid-color', e.target.value));
+        document.getElementById('gridSize').addEventListener('input', (e) => root.style.setProperty('--grid-size', e.target.value + 'em'));
+        document.getElementById('gridSpacing').addEventListener('input', (e) => root.style.setProperty('--grid-spacing', e.target.value + 'em'));
+        document.getElementById('gridLineHeight').addEventListener('input', (e) => root.style.setProperty('--grid-line-height', e.target.value));
+        document.getElementById('gridWeight').addEventListener('input', (e) => root.style.setProperty('--grid-weight', e.target.value));
+
+        // Style Inputs - Backgrounds
+        document.getElementById('headerBgColor').addEventListener('input', (e) => root.style.setProperty('--header-bg-color', e.target.value));
+        document.getElementById('bgColor').addEventListener('input', (e) => root.style.setProperty('--bg-color', e.target.value));
+
+        // Generate Grid
+        function generateGrid() {
+            const target = document.getElementById('targetNumber').value || '89';
+            const filler = document.getElementById('fillerNumber').value || '98';
+            const rows = 16;
+            const cols = 15;
+            const totalCells = rows * cols;
+            const targetIndex = Math.floor(Math.random() * totalCells);
+
+            numberGrid.innerHTML = '';
+            for (let i = 0; i < totalCells; i++) {
+                const cell = document.createElement('div');
+                cell.textContent = (i === targetIndex) ? target : filler;
+                numberGrid.appendChild(cell);
+            }
+        }
+
+        // Initial generation and listeners for number changes
+        generateGrid();
+        document.getElementById('targetNumber').addEventListener('input', generateGrid);
+        document.getElementById('fillerNumber').addEventListener('input', generateGrid);
+
+    </script>
+</body>
+</html>
